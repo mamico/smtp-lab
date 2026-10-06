@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Local overrides (compose picks up .env automatically)
+.env
+*.local
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Claude Code local state
+.claude/
+
+# Source checkouts (own git repos)
+src/*
+!src/.gitkeep

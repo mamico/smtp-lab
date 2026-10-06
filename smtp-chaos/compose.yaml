@@ -1,0 +1,72 @@
+# Reusable SMTP test bench: Mailpit (dev SMTP + web UI) behind Toxiproxy.
+#
+#   client -> toxiproxy:2525 -> mailpit:1025   (plain, STARTTLS offered)
+#   client -> toxiproxy:4650 -> smtps:465 -> mailpit:1025   (implicit TLS)
+#
+# Other stacks join the external network "smtp-lab" and use these hosts.
+name: smtp-chaos
+
+services:
+  certs:
+    image: alpine/openssl
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        [ -f /certs/server.pem ] && exit 0
+        openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+          -keyout /certs/server.key -out /certs/server.crt \
+          -subj "/CN=smtp-lab" \
+          -addext "subjectAltName=DNS:toxiproxy,DNS:smtps,DNS:mailpit,DNS:localhost,IP:127.0.0.1"
+        cat /certs/server.crt /certs/server.key > /certs/server.pem
+        chmod 644 /certs/*
+    volumes:
+      - certs:/certs
+
+  mailpit:
+    image: axllent/mailpit
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+      MP_SMTP_TLS_CERT: /certs/server.crt
+      MP_SMTP_TLS_KEY: /certs/server.key
+      MP_MAX_MESSAGES: "5000"
+    volumes:
+      - certs:/certs:ro
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+    networks: [smtp-lab]
+
+  # Implicit TLS (SMTPS) terminator: Mailpit has no implicit-TLS listener.
+  smtps:
+    image: alpine/socat
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+    command: OPENSSL-LISTEN:465,fork,reuseaddr,cert=/certs/server.pem,verify=0 TCP:mailpit:1025
+    volumes:
+      - certs:/certs:ro
+    networks: [smtp-lab]
+
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy
+    command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
+    depends_on: [mailpit, smtps]
+    volumes:
+      - ./toxiproxy.json:/config/toxiproxy.json:ro
+    ports:
+      - "${TOXIPROXY_API_PORT:-8474}:8474"
+      - "${SMTP_PORT:-2525}:2525"
+      - "${SMTPS_PORT:-4650}:4650"
+    networks: [smtp-lab]
+
+volumes:
+  certs:
+
+networks:
+  smtp-lab:
+    name: smtp-lab

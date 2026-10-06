@@ -1,0 +1,44 @@
+# Plone (ZEO + client) with a local zope.sendmail checkout installed editable.
+# Requires the smtp-chaos stack (network "smtp-lab").
+#
+#   ZOPE_SENDMAIL_SRC  zope.sendmail checkout   (default: ../src/zope.sendmail)
+#   MAILHOST_SRC       Products.MailHost checkout (default: ../src/Products.MailHost)
+name: plone-smtp-lab
+
+x-plone: &plone
+  image: plone/plone-backend:${PLONE_VERSION:-6.1}
+  environment: &plone-env
+    ZEO_ADDRESS: zeo:8100
+    DEVELOP: "/app/src/zope.sendmail /app/src/Products.MailHost"
+    PIP_PARAMS: --no-deps
+    DEBUG_MODE: "on"
+  volumes:
+    - ${ZOPE_SENDMAIL_SRC:-../src/zope.sendmail}:/app/src/zope.sendmail
+    - ${MAILHOST_SRC:-../src/Products.MailHost}:/app/src/Products.MailHost
+    - ./scripts:/scripts:ro
+  networks: [smtp-lab, default]
+
+services:
+  zeo:
+    image: plone/plone-zeo:${ZEO_VERSION:-latest}
+    volumes:
+      - zeo-data:/data
+    networks: [default]
+
+  plone:
+    <<: *plone
+    depends_on: [zeo]
+    environment:
+      <<: *plone-env
+      SITE: Plone
+      TYPE: classic
+    ports:
+      - "${PLONE_PORT:-8080}:8080"
+
+volumes:
+  zeo-data:
+
+networks:
+  smtp-lab:
+    external: true
+    name: smtp-lab
