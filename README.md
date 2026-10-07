@@ -5,7 +5,7 @@ Reusable Docker Compose test bench for anything that sends mail over SMTP:
 - **smtp-chaos/** – [Mailpit](https://mailpit.axllent.org/) (dev SMTP server + web UI)
   behind [Toxiproxy](https://github.com/Shopify/toxiproxy) to inject latency,
   stalls, resets and truncated connections. Offers plain, STARTTLS and implicit TLS.
-- **plone/** – Plone 6.1 (ZEO + client) with a local `zope.sendmail` checkout
+- **plone/** – Plone (ZEO + client) with a local `zope.sendmail` checkout
   installed editable from source, wired to the bench. Use it as a template for
   other stacks: just join the external `smtp-lab` network.
 
